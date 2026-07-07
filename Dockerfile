@@ -37,7 +37,7 @@ EXPOSE 19443 48101
 
 COPY --from=builder /build/nexus-cnc /nexus-cnc
 
-# Store data in a volume so it survives container restarts.
-VOLUME ["/data"]
-
+# NOTE: for persistent data on Railway, add a Railway Volume mounted at /data
+# in the Railway dashboard (no code change needed — just click "Add Volume").
+# For docker/VPS: use `-v nexus-data:/data` on the docker run command.
 ENTRYPOINT ["/nexus-cnc", "-port", "19443"]
