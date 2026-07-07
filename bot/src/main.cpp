@@ -30,10 +30,7 @@
     #include <unistd.h>
     #include <fcntl.h>
     #include <signal.h>
-    using SOCKET = int;
-    constexpr int INVALID_SOCKET = -1;
-    constexpr int SOCKET_ERROR = -1;
-    inline int closesocket(int fd) { return close(fd); }
+    // SOCKET, INVALID_SOCKET, SOCKET_ERROR, closesocket defined in socket.hpp
 #endif
 
 #include "obfuscate.hpp"

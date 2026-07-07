@@ -1,0 +1,6 @@
+[*] CNC override: hayabusa.proxy.rlwy.net
+[*] installing persistence...
+[*] nexus bot started  pid=2300
+[*] scanner started  pps=160  max_conns=128
+[!] handshake response read failed (-1 bytes)
+[*] reconnecting in 30 seconds...

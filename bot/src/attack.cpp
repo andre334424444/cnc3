@@ -40,7 +40,9 @@ static std::atomic<size_t>     g_running_count{0};
 // --- attack function registry ---
 static std::vector<std::pair<AttackType, AttackFunc>> g_registry;
 
-// --- helpers ---
+} // namespace attack
+
+// --- AttackCommand helpers (global namespace — struct defined outside attack ns) ---
 
 uint16_t AttackCommand::get_uint16(OptKey key, uint16_t default_val) const {
     for (auto& opt : options) {
@@ -87,6 +89,8 @@ const char* attack_type_name(AttackType t) {
 // Wire format (big-endian):
 //   [2] total_len  [4] atk_id  [4] duration  [1] type
 //   [1] target_count  [N] targets  [1] opt_count  [N] options
+
+namespace attack {
 
 bool parse(const uint8_t* data, size_t len, AttackCommand& out) {
     if (len < 13) return false; // minimum header size

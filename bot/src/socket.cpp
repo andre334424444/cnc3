@@ -10,6 +10,7 @@
 #else
     #include <sys/time.h>
     #include <sys/ioctl.h>
+    #include <netdb.h>      // getaddrinfo, freeaddrinfo
 #endif
 
 namespace sock {

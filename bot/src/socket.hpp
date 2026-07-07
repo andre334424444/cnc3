@@ -24,8 +24,8 @@
     #include <fcntl.h>
     #include <errno.h>
     using SOCKET = int;
-    constexpr int INVALID_SOCKET = -1;
-    constexpr int SOCKET_ERROR = -1;
+    inline constexpr int INVALID_SOCKET = -1;
+    inline constexpr int SOCKET_ERROR = -1;
     inline int closesocket(int fd) { return close(fd); }
 #endif
 
