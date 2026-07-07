@@ -119,10 +119,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	if first[0] == 0x00 {
-		// Bot — prepend the 4 bytes we already read into a buffered reader.
-		reader := bufio.NewReader(conn)
-		// We already consumed 4 bytes. handleBot expects them to be
-		// available in the reader. Create a reader that starts with them.
+		// Bot — pass the 4 pre-read magic bytes directly.
 		handleBotWithFirstBytes(conn, first)
 	} else {
 		// Admin — but we already ate 4 bytes. Pass them to admin handler.
