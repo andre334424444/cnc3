@@ -1,0 +1,17 @@
+# services, secrets, env — nothing sensitive, just docker compose hints
+
+data/
+
+# go build artifacts
+*.exe
+*.test
+*.out
+
+# editor / os
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

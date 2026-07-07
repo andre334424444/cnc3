@@ -1,0 +1,21 @@
+# nexus — .gitignore
+
+# runtime data
+*.json
+data/
+
+# build artifacts
+*.exe
+*.test
+*.out
+*.o
+
+# os
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# leftover (deprecated folder)
+deploy/

