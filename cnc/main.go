@@ -16,6 +16,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -101,26 +102,31 @@ func main() {
 //   - 0x00 → bot binary handshake
 //   - anything else → admin telnet session
 func handleConnection(conn net.Conn) {
-	reader := bufio.NewReader(conn)
-
-	// Set a deadline for the first byte. Bots send their handshake
-	// immediately (4 bytes starting with 0x00). Telnet clients wait
-	// for the server to initiate negotiation. If nothing arrives in
-	// 2 seconds, assume it's a human admin on telnet.
+	// Read first 4 bytes. Bots send 0x00000001 immediately.
+	// Telnet clients send IAC negotiation (starts with 0xFF).
+	// If nothing arrives in 2 seconds, assume admin.
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	first, err := reader.Peek(1)
-	conn.SetReadDeadline(time.Time{}) // clear deadline for subsequent reads
+	first := make([]byte, 4)
+	n, err := io.ReadFull(conn, first)
+	conn.SetReadDeadline(time.Time{})
 
-	if err != nil {
-		// Timeout or error — assume admin (telnet client waiting for us).
-		// Bots never wait; they send the handshake immediately.
+	if err != nil || n < 4 {
+		// Timeout or short read — assume admin.
+		// Wrap the connection in a reader that prepends whatever we did read.
+		reader := bufio.NewReader(conn)
 		handleAdmin(conn, reader)
 		return
 	}
 
 	if first[0] == 0x00 {
-		handleBot(conn, reader)
+		// Bot — prepend the 4 bytes we already read into a buffered reader.
+		reader := bufio.NewReader(conn)
+		// We already consumed 4 bytes. handleBot expects them to be
+		// available in the reader. Create a reader that starts with them.
+		handleBotWithFirstBytes(conn, first)
 	} else {
+		// Admin — but we already ate 4 bytes. Pass them to admin handler.
+		reader := bufio.NewReader(conn)
 		handleAdmin(conn, reader)
 	}
 }

@@ -27,30 +27,20 @@ const (
 	BotReadTimeout      = 180 * time.Second // 3× keepalive interval
 )
 
-func handleBot(conn net.Conn, reader *bufio.Reader) {
+func handleBotWithFirstBytes(conn net.Conn, magicBytes []byte) {
 	defer conn.Close()
 	remote := conn.RemoteAddr().String()
 
-	log.Printf("[debug] handleBot started from %s", remote)
-
-	// --- read full handshake ---
-	// We already peeked 1 byte (the leading 0x00), so read 3 more for the magic.
-	magicBytes := make([]byte, 4)
-	magicBytes[0] = 0x00
-
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	_, err := io.ReadFull(reader, magicBytes[1:])
-	if err != nil {
-		log.Printf("[!] bot handshake read (magic) from %s: %v", remote, err)
-		return
-	}
-	log.Printf("[debug] magic read OK from %s: %x", remote, magicBytes)
+	log.Printf("[debug] handleBot from %s  magic=%x", remote, magicBytes)
 
 	magic := binary.BigEndian.Uint32(magicBytes)
 	if magic != BotHandshakeMagic {
 		log.Printf("[!] bot sent bad magic: 0x%08x from %s", magic, remote)
 		return
 	}
+
+	reader := bufio.NewReader(conn)
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 
 	// --- read architecture string ---
 	archLenBytes := make([]byte, 2)
