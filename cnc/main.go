@@ -103,10 +103,18 @@ func main() {
 func handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 
-	// Peek without consuming — we need to know what we're dealing with.
+	// Set a deadline for the first byte. Bots send their handshake
+	// immediately (4 bytes starting with 0x00). Telnet clients wait
+	// for the server to initiate negotiation. If nothing arrives in
+	// 2 seconds, assume it's a human admin on telnet.
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	first, err := reader.Peek(1)
+	conn.SetReadDeadline(time.Time{}) // clear deadline for subsequent reads
+
 	if err != nil {
-		conn.Close()
+		// Timeout or error — assume admin (telnet client waiting for us).
+		// Bots never wait; they send the handshake immediately.
+		handleAdmin(conn, reader)
 		return
 	}
 
