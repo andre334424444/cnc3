@@ -67,6 +67,11 @@ func handleAdmin(conn net.Conn, reader *bufio.Reader) {
 	s.write([]byte{ IAC, DO, 3 })     // request they suppress go-ahead
 	s.flush()
 
+	// --- handle client telnet negotiation ---
+	// Windows/putty telnet clients send IAC sequences after connecting.
+	// We need to respond to them before the client will display our output.
+	s.negotiate()
+
 	// --- banner ---
 	s.writeString(banner)
 	s.flush()
@@ -81,6 +86,76 @@ func handleAdmin(conn net.Conn, reader *bufio.Reader) {
 	// --- main loop ---
 	s.mainLoop()
 	log.Printf("[*] admin logout: %s", s.user.Username)
+}
+
+func (s *adminSession) negotiate() {
+	// Windows telnet clients send IAC sequences on connect.
+	// If we don't respond to them, the client won't display our output.
+	// We read with a short timeout, handle what we get, and move on.
+
+	rawConn := s.conn
+	rawConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+
+	buf := make([]byte, 64)
+	n, err := rawConn.Read(buf)
+	if err != nil || n == 0 {
+		// No negotiation bytes from client — that's fine, some clients don't send any.
+		rawConn.SetReadDeadline(time.Time{})
+		return
+	}
+
+	// Handle IAC sequences in the received data.
+	for i := 0; i < n-2; i++ {
+		if buf[i] != IAC {
+			continue
+		}
+		cmd := buf[i+1]
+		opt := buf[i+2]
+
+		switch cmd {
+		case WILL:
+			// Client wants to use this option. We either accept (DO) or refuse (DONT).
+			switch opt {
+			case 24: // terminal-type
+				s.write([]byte{IAC, DO, opt})
+			case 31: // NAWS (window size)
+				s.write([]byte{IAC, DO, opt})
+			case 39: // new-environ
+				s.write([]byte{IAC, DONT, opt})
+			default:
+				s.write([]byte{IAC, DONT, opt})
+			}
+		case WONT:
+			s.write([]byte{IAC, DONT, opt})
+		case DO:
+			// Client wants us to use this option.
+			switch opt {
+			case 1: // echo
+				s.write([]byte{IAC, WILL, opt})
+			case 3: // suppress go-ahead
+				s.write([]byte{IAC, WILL, opt})
+			case 31: // NAWS
+				s.write([]byte{IAC, WILL, opt})
+			default:
+				s.write([]byte{IAC, WONT, opt})
+			}
+		case DONT:
+			s.write([]byte{IAC, WONT, opt})
+		case SB:
+			// Sub-negotiation — skip until IAC SE.
+			for j := i + 3; j < n-1; j++ {
+				if buf[j] == IAC && buf[j+1] == SE {
+					i = j + 1 // skip past the SE
+					break
+				}
+			}
+		}
+
+		i += 2 // skip past the IAC cmd opt triplet
+	}
+
+	s.flush()
+	rawConn.SetReadDeadline(time.Time{})
 }
 
 func (s *adminSession) login() bool {
