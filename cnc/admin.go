@@ -196,6 +196,10 @@ func (s *adminSession) login() bool {
 			return true
 		}
 
+		// Log the failed attempt for debugging.
+		log.Printf("[!] login failed: username=%q len=%d  password_len=%d  from=%s",
+			username, len(username), len(password), s.conn.RemoteAddr())
+
 		s.writeString("invalid credentials.\r\n")
 		s.flush()
 		time.Sleep(1 * time.Second)
@@ -475,7 +479,36 @@ func (s *adminSession) readLine() (string, error) {
 	}
 	// Strip trailing \r\n.
 	line = strings.TrimRight(line, "\r\n")
+	// Strip any telnet IAC sequences that got mixed into input.
+	// (Windows telnet clients may send SB terminal-type responses mid-session.)
+	line = stripIAC(line)
 	return line, nil
+}
+
+// stripIAC removes telnet command sequences from a string.
+func stripIAC(s string) string {
+	bytes := []byte(s)
+	out := make([]byte, 0, len(bytes))
+	for i := 0; i < len(bytes); i++ {
+		if bytes[i] == IAC && i+2 < len(bytes) {
+			// IAC command: skip 3 bytes (IAC + cmd + opt).
+			cmd := bytes[i+1]
+			if cmd == SB {
+				// Sub-negotiation: skip until IAC SE.
+				for j := i + 2; j < len(bytes)-1; j++ {
+					if bytes[j] == IAC && bytes[j+1] == SE {
+						i = j + 1 // skip to after SE
+						break
+					}
+				}
+			} else {
+				i += 2 // skip cmd + opt
+			}
+			continue
+		}
+		out = append(out, bytes[i])
+	}
+	return string(out)
 }
 
 func (s *adminSession) writeString(msg string) {
